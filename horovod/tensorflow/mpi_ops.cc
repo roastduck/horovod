@@ -18,6 +18,7 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
+#include <iostream>
 
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/op_kernel.h"
@@ -287,13 +288,30 @@ public:
     auto hvd_context = std::make_shared<TFOpContext>(context);
     auto hvd_tensor = std::make_shared<TFTensor>(tensor);
     auto hvd_output = std::make_shared<TFTensor>(*output);
-    auto enqueue_result = EnqueueTensorAllreduce(
-        hvd_context, hvd_tensor, hvd_output, ready_event, node_name, device,
-        [context, done](const common::Status& status) {
-          context->SetStatus(ConvertStatus(status));
-          done();
-        });
-    OP_REQUIRES_OK_ASYNC(context, ConvertStatus(enqueue_result), done);
+
+    static int mul28Cnt = 0;
+    bool doReduce = false;
+    if (node_name != "v0/tower_0/HorovodAllreduce_v0_tower_0_mul_28_0")
+        doReduce = true;
+    else if (++mul28Cnt < 10000)
+        doReduce = true;
+    else if (mul28Cnt % 4 == 0)
+        doReduce = true;
+    if (doReduce)
+    {
+      auto enqueue_result = EnqueueTensorAllreduce(
+          hvd_context, hvd_tensor, hvd_output, ready_event, node_name, device,
+          [context, done](const common::Status& status) {
+            context->SetStatus(ConvertStatus(status));
+            done();
+          });
+      OP_REQUIRES_OK_ASYNC(context, ConvertStatus(enqueue_result), done);
+    } else
+    {
+      OP_REQUIRES_OK_ASYNC(context, ConvertStatus(common::Status::OK()), done);
+      context->SetStatus(ConvertStatus(common::Status::OK()));
+      done();
+    }
   }
 };
 
