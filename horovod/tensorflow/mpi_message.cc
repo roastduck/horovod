@@ -41,6 +41,9 @@ const std::string& MPIDataType_Name(MPIDataType value) {
   case TF_MPI_INT64:
     static const std::string int64("int64");
     return int64;
+  case TF_MPI_FLOAT16:
+    static const std::string float16("float16");
+    return float16;
   case TF_MPI_FLOAT32:
     static const std::string float32("float32");
     return float32;

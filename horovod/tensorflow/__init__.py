@@ -41,16 +41,14 @@ from horovod.tensorflow.mpi_ops import _allreduce
 from horovod.tensorflow.mpi_ops import init
 
 
-def allreduce(tensor, average_dense=True, average_sparse=True, use_allgatherv=False, device_dense='', device_sparse=''):
+def allreduce(tensor, average=True, use_allgatherv=False, device_dense='', device_sparse=''):
     """Perform an allreduce on a tf.Tensor or tf.IndexedSlices.
 
     Arguments:
         tensor: tf.Tensor, tf.Variable, or tf.IndexedSlices to reduce.
         The shape of the input must be identical across all ranks.
-        average_dense: If True, computes the average over all ranks for dense tensors.
-                       Otherwise, computes the sum over all ranks.
-        average_sparse: If True, computes the average over all ranks for sparse tensors.
-                        Otherwise, computes the sum over all ranks.
+        average: If True, computes the average over all ranks.
+                 Otherwise, computes the sum over all ranks.
         device_dense: Device to be used for dense tensors. Uses GPU by default
                       if Horovod was build with HOROVOD_GPU_ALLREDUCE.
         device_sparse: Device to be used for sparse tensors. Uses GPU by default
@@ -73,15 +71,14 @@ def allreduce(tensor, average_dense=True, average_sparse=True, use_allgatherv=Fa
             # To make this operation into an average, divide all gathered values by
             # the Horovod size.
             horovod_size = tf.cast(size(), tensor.values.dtype)
-            new_values = tf.div(values, horovod_size) if average_sparse else values
+            new_values = tf.div(values, horovod_size) if average else values
         return tf.IndexedSlices(new_values, indices,
                                 dense_shape=tensor.dense_shape)
     else:
         with tf.device(device_dense):
             horovod_size = tf.cast(size(), tensor.dtype)
-            summed_tensor = _allreduce(tensor)
-            new_tensor = (tf.div(summed_tensor, horovod_size)
-                          if average_dense else summed_tensor)
+            tensor_to_sum = tf.div(tensor, horovod_size) if average else tensor
+            new_tensor = _allreduce(tensor_to_sum)
         return new_tensor
 
 

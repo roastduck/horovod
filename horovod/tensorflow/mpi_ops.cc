@@ -176,6 +176,8 @@ struct HorovodGlobalState {
   int local_rank = 0;
   int size = 1;
 
+  MPI_Datatype mpi_float16_t;
+
 // The CUDA stream used for data transfers and within-allreduce operations.
 // A naive implementation would use the TensorFlow StreamExecutor CUDA
 // stream. However, the allreduce and allgather require doing memory copies
@@ -508,6 +510,8 @@ Status GetMPIDataType(const Tensor tensor, MPI_Datatype* dtype) {
   case DT_INT64:
     *dtype = MPI_INT64_T;
     return Status::OK();
+  case DT_HALF:
+    *dtype = horovod_global.mpi_float16_t;
   case DT_FLOAT:
     *dtype = MPI_FLOAT;
     return Status::OK();
@@ -532,6 +536,9 @@ Status GetNCCLDataType(const Tensor tensor, ncclDataType_t* dtype) {
     return Status::OK();
   case DT_INT64:
     *dtype = ncclInt64;
+    return Status::OK();
+  case DT_HALF:
+    *dtype = ncclFloat16;
     return Status::OK();
   case DT_FLOAT:
     *dtype = ncclFloat32;
@@ -1528,9 +1535,14 @@ void BackgroundThreadLoop(HorovodGlobalState& state) {
   int local_rank;
   MPI_Comm_rank(local_comm, &local_rank);
 
+  MPI_Datatype mpi_float16_t;
+  MPI_Type_contiguous(2, MPI_BYTE, &mpi_float16_t);
+  MPI_Type_commit(&mpi_float16_t);
+
   state.rank = rank;
   state.local_rank = local_rank;
   state.size = size;
+  state.mpi_float16_t = mpi_float16_t;
   state.initialization_done = true;
 
   // Open the timeline file on coordinator.
@@ -1770,6 +1782,7 @@ void BackgroundThreadLoop(HorovodGlobalState& state) {
   //    ncclCommDestroy(it->second);
   //  }
   //#endif
+  MPI_Type_free(&state.mpi_float16_t);
   MPI_Finalize();
 }
 
@@ -1847,6 +1860,9 @@ Status DataTypeToMPIType(DataType tf_dtype, MPIDataType* mpi_dtype) {
     return Status::OK();
   case DT_INT64:
     *mpi_dtype = TF_MPI_INT64;
+    return Status::OK();
+  case DT_HALF:
+    *mpi_dtype = TF_MPI_FLOAT16;
     return Status::OK();
   case DT_FLOAT:
     *mpi_dtype = TF_MPI_FLOAT32;
@@ -2081,7 +2097,7 @@ REGISTER_KERNEL_BUILDER(Name("HorovodAllreduce").Device(DEVICE_GPU),
 #endif
 
 REGISTER_OP("HorovodAllreduce")
-    .Attr("T: {int32, int64, float32, float64}")
+    .Attr("T: {int32, int64, float16, float32, float64}")
     .Input("tensor: T")
     .Output("sum: T")
     .SetShapeFn([](shape_inference::InferenceContext* c) {
@@ -2129,7 +2145,7 @@ REGISTER_KERNEL_BUILDER(Name("HorovodAllgather").Device(DEVICE_GPU),
 #endif
 
 REGISTER_OP("HorovodAllgather")
-    .Attr("T: {uint8, int8, uint16, int16, int32, int64, float32, float64, bool}")
+    .Attr("T: {uint8, int8, uint16, int16, int32, int64, float16, float32, float64, bool}")
     .Input("tensor: T")
     .Output("output: T")
     .SetShapeFn([](shape_inference::InferenceContext* c) {
@@ -2181,7 +2197,7 @@ REGISTER_KERNEL_BUILDER(Name("HorovodAllgatherv").Device(DEVICE_GPU),
 #endif
 
 REGISTER_OP("HorovodAllgatherv")
-    .Attr("T: {uint8, int8, uint16, int16, int32, int64, float32, float64, bool}")
+    .Attr("T: {uint8, int8, uint16, int16, int32, int64, float16, float32, float64, bool}")
     .Input("tensor: T")
     .Output("output: T")
     .SetShapeFn([](shape_inference::InferenceContext* c) {
@@ -2244,7 +2260,7 @@ REGISTER_KERNEL_BUILDER(Name("HorovodBroadcast").Device(DEVICE_GPU),
 #endif
 
 REGISTER_OP("HorovodBroadcast")
-    .Attr("T: {uint8, int8, uint16, int16, int32, int64, float32, float64, bool}")
+    .Attr("T: {uint8, int8, uint16, int16, int32, int64, float16, float32, float64, bool}")
     .Attr("root_rank: int")
     .Input("tensor: T")
     .Output("output: T")
