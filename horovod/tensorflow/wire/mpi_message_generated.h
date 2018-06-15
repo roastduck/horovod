@@ -16,6 +16,8 @@ struct MPIRequestList;
 
 struct MPIResponse;
 
+struct MPIResponseList;
+
 enum MPIDataType {
   MPIDataType_TF_MPI_UINT8 = 0,
   MPIDataType_TF_MPI_INT8 = 1,
@@ -110,21 +112,17 @@ enum MPIResponseType {
   MPIResponseType_ALLGATHERV = 2,
   MPIResponseType_BROADCAST = 3,
   MPIResponseType_ERROR = 4,
-  MPIResponseType_DONE = 5,
-  MPIResponseType_SHUTDOWN = 6,
   MPIResponseType_MIN = MPIResponseType_ALLREDUCE,
-  MPIResponseType_MAX = MPIResponseType_SHUTDOWN
+  MPIResponseType_MAX = MPIResponseType_ERROR
 };
 
-inline const MPIResponseType (&EnumValuesMPIResponseType())[7] {
+inline const MPIResponseType (&EnumValuesMPIResponseType())[5] {
   static const MPIResponseType values[] = {
     MPIResponseType_ALLREDUCE,
     MPIResponseType_ALLGATHER,
     MPIResponseType_ALLGATHERV,
     MPIResponseType_BROADCAST,
-    MPIResponseType_ERROR,
-    MPIResponseType_DONE,
-    MPIResponseType_SHUTDOWN
+    MPIResponseType_ERROR
   };
   return values;
 }
@@ -136,8 +134,6 @@ inline const char * const *EnumNamesMPIResponseType() {
     "ALLGATHERV",
     "BROADCAST",
     "ERROR",
-    "DONE",
-    "SHUTDOWN",
     nullptr
   };
   return names;
@@ -419,6 +415,56 @@ inline flatbuffers::Offset<MPIResponse> CreateMPIResponseDirect(
       error_message ? _fbb.CreateString(error_message) : 0,
       devices ? _fbb.CreateVector<int32_t>(*devices) : 0,
       tensor_sizes ? _fbb.CreateVector<int64_t>(*tensor_sizes) : 0);
+}
+
+struct MPIResponseList FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  enum {
+    VT_RESPONSES = 4
+  };
+  const flatbuffers::Vector<flatbuffers::Offset<MPIResponse>> *responses() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<MPIResponse>> *>(VT_RESPONSES);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_RESPONSES) &&
+           verifier.Verify(responses()) &&
+           verifier.VerifyVectorOfTables(responses()) &&
+           verifier.EndTable();
+  }
+};
+
+struct MPIResponseListBuilder {
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_responses(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<MPIResponse>>> responses) {
+    fbb_.AddOffset(MPIResponseList::VT_RESPONSES, responses);
+  }
+  explicit MPIResponseListBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  MPIResponseListBuilder &operator=(const MPIResponseListBuilder &);
+  flatbuffers::Offset<MPIResponseList> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<MPIResponseList>(end);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<MPIResponseList> CreateMPIResponseList(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<MPIResponse>>> responses = 0) {
+  MPIResponseListBuilder builder_(_fbb);
+  builder_.add_responses(responses);
+  return builder_.Finish();
+}
+
+inline flatbuffers::Offset<MPIResponseList> CreateMPIResponseListDirect(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    const std::vector<flatbuffers::Offset<MPIResponse>> *responses = nullptr) {
+  return horovod::tensorflow::wire::CreateMPIResponseList(
+      _fbb,
+      responses ? _fbb.CreateVector<flatbuffers::Offset<MPIResponse>>(*responses) : 0);
 }
 
 }  // namespace wire
