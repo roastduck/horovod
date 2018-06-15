@@ -29,8 +29,24 @@ enum MPIDataType {
   MPIDataType_MAX = MPIDataType_TF_MPI_BOOL
 };
 
-inline const char **EnumNamesMPIDataType() {
-  static const char *names[] = {
+inline const MPIDataType (&EnumValuesMPIDataType())[10] {
+  static const MPIDataType values[] = {
+    MPIDataType_TF_MPI_UINT8,
+    MPIDataType_TF_MPI_INT8,
+    MPIDataType_TF_MPI_UINT16,
+    MPIDataType_TF_MPI_INT16,
+    MPIDataType_TF_MPI_INT32,
+    MPIDataType_TF_MPI_INT64,
+    MPIDataType_TF_MPI_FLOAT16,
+    MPIDataType_TF_MPI_FLOAT32,
+    MPIDataType_TF_MPI_FLOAT64,
+    MPIDataType_TF_MPI_BOOL
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesMPIDataType() {
+  static const char * const names[] = {
     "TF_MPI_UINT8",
     "TF_MPI_INT8",
     "TF_MPI_UINT16",
@@ -60,8 +76,18 @@ enum MPIRequestType {
   MPIRequestType_MAX = MPIRequestType_BROADCAST
 };
 
-inline const char **EnumNamesMPIRequestType() {
-  static const char *names[] = {
+inline const MPIRequestType (&EnumValuesMPIRequestType())[4] {
+  static const MPIRequestType values[] = {
+    MPIRequestType_ALLREDUCE,
+    MPIRequestType_ALLGATHER,
+    MPIRequestType_ALLGATHERV,
+    MPIRequestType_BROADCAST
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesMPIRequestType() {
+  static const char * const names[] = {
     "ALLREDUCE",
     "ALLGATHER",
     "ALLGATHERV",
@@ -88,8 +114,21 @@ enum MPIResponseType {
   MPIResponseType_MAX = MPIResponseType_SHUTDOWN
 };
 
-inline const char **EnumNamesMPIResponseType() {
-  static const char *names[] = {
+inline const MPIResponseType (&EnumValuesMPIResponseType())[7] {
+  static const MPIResponseType values[] = {
+    MPIResponseType_ALLREDUCE,
+    MPIResponseType_ALLGATHER,
+    MPIResponseType_ALLGATHERV,
+    MPIResponseType_BROADCAST,
+    MPIResponseType_ERROR,
+    MPIResponseType_DONE,
+    MPIResponseType_SHUTDOWN
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesMPIResponseType() {
+  static const char * const names[] = {
     "ALLREDUCE",
     "ALLGATHER",
     "ALLGATHERV",
@@ -143,11 +182,11 @@ struct MPIRequest FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyField<int32_t>(verifier, VT_REQUEST_RANK) &&
            VerifyField<int8_t>(verifier, VT_REQUEST_TYPE) &&
            VerifyField<int8_t>(verifier, VT_TENSOR_TYPE) &&
-           VerifyField<flatbuffers::uoffset_t>(verifier, VT_TENSOR_NAME) &&
+           VerifyOffset(verifier, VT_TENSOR_NAME) &&
            verifier.Verify(tensor_name()) &&
            VerifyField<int32_t>(verifier, VT_ROOT_RANK) &&
            VerifyField<int32_t>(verifier, VT_DEVICE) &&
-           VerifyField<flatbuffers::uoffset_t>(verifier, VT_TENSOR_SHAPE) &&
+           VerifyOffset(verifier, VT_TENSOR_SHAPE) &&
            verifier.Verify(tensor_shape()) &&
            verifier.EndTable();
   }
@@ -177,13 +216,13 @@ struct MPIRequestBuilder {
   void add_tensor_shape(flatbuffers::Offset<flatbuffers::Vector<int64_t>> tensor_shape) {
     fbb_.AddOffset(MPIRequest::VT_TENSOR_SHAPE, tensor_shape);
   }
-  MPIRequestBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+  explicit MPIRequestBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
   MPIRequestBuilder &operator=(const MPIRequestBuilder &);
   flatbuffers::Offset<MPIRequest> Finish() {
-    const auto end = fbb_.EndTable(start_, 7);
+    const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<MPIRequest>(end);
     return o;
   }
@@ -255,14 +294,14 @@ struct MPIResponse FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_RESPONSE_TYPE) &&
-           VerifyField<flatbuffers::uoffset_t>(verifier, VT_TENSOR_NAMES) &&
+           VerifyOffset(verifier, VT_TENSOR_NAMES) &&
            verifier.Verify(tensor_names()) &&
            verifier.VerifyVectorOfStrings(tensor_names()) &&
-           VerifyField<flatbuffers::uoffset_t>(verifier, VT_ERROR_MESSAGE) &&
+           VerifyOffset(verifier, VT_ERROR_MESSAGE) &&
            verifier.Verify(error_message()) &&
-           VerifyField<flatbuffers::uoffset_t>(verifier, VT_DEVICES) &&
+           VerifyOffset(verifier, VT_DEVICES) &&
            verifier.Verify(devices()) &&
-           VerifyField<flatbuffers::uoffset_t>(verifier, VT_TENSOR_SIZES) &&
+           VerifyOffset(verifier, VT_TENSOR_SIZES) &&
            verifier.Verify(tensor_sizes()) &&
            verifier.EndTable();
   }
@@ -286,13 +325,13 @@ struct MPIResponseBuilder {
   void add_tensor_sizes(flatbuffers::Offset<flatbuffers::Vector<int64_t>> tensor_sizes) {
     fbb_.AddOffset(MPIResponse::VT_TENSOR_SIZES, tensor_sizes);
   }
-  MPIResponseBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+  explicit MPIResponseBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
   MPIResponseBuilder &operator=(const MPIResponseBuilder &);
   flatbuffers::Offset<MPIResponse> Finish() {
-    const auto end = fbb_.EndTable(start_, 5);
+    const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<MPIResponse>(end);
     return o;
   }
