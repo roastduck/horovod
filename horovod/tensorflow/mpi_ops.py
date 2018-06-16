@@ -20,10 +20,13 @@ from __future__ import division
 from __future__ import print_function
 
 import re
+import tensorflow as tf
 from tensorflow.python.framework import load_library
 from tensorflow.python.framework import ops
 from tensorflow.python.platform import resource_loader
 
+from horovod.common import size
+from horovod.common import rank
 from horovod.common import get_ext_suffix
 
 
@@ -96,7 +99,17 @@ def allgather(tensor, name=None):
     """
     if name is None:
         name = 'HorovodAllgather_%s' % _normalize_name(tensor.name)
-    return MPI_LIB.horovod_allgather(tensor, name=name)
+    # Ring allreduce transfer the same amount of data as allgather
+    # so we're using allreduce instead
+    n = size()
+    k = rank()
+    shape = tensor.shape.as_list()
+    shapeL = tuple([k * shape[0]] + shape[1:])
+    shapeR = tuple([(n - k - 1) * shape[0]] + shape[1:])
+    left = tf.zeros(shapeL, dtype=tensor.dtype)
+    right = tf.zeros(shapeR, dtype=tensor.dtype)
+    concat = tf.concat([left, tensor, right], 0)
+    return _allreduce(concat) # This function perfroms sum, not avg
 
 
 ops.NotDifferentiable('HorovodAllgather')
