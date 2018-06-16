@@ -108,7 +108,7 @@ def allgather(tensor, name=None):
     shapeR = tuple([(n - k - 1) * shape[0]] + shape[1:])
     left = tf.zeros(shapeL, dtype=tensor.dtype)
     right = tf.zeros(shapeR, dtype=tensor.dtype)
-    concat = tf.concat([left, tensor, right], 0)
+    concat = tf.concat([left, tensor, right], 0, name=name)
     return _allreduce(concat) # This function perfroms sum, not avg
 
 
